@@ -20,6 +20,54 @@ import PyroConfig as config
 from ParseSauceURL import *
 from SauceRest import *
  
+class Jybot():
+    """ Helper class to interact with RobotFrameworks pybot script to execute tests / test suites.    
+    """
+    name = ""
+    tests = []
+    suite = ""
+    args = []
+    output = ""
+    process = -1
+    running = False
+   
+    def __init__(self, name):
+        """ Constructor, creates the object and assigns the given 'name'.
+        """
+        self.name = name
+   
+    def start(self, suite, args=[]):
+        """ Starts the pybot script from RobotFramework executing the defined 'tests' from the given 'suite'.
+        'suite' is the filename of the test suite containing the 'tests'
+        'args' (optional) is a list of additional parameters passed to pybot
+        """
+        self.suite = suite
+        self.output_file = "%s_Output.xml" % (self.name)
+        temp, suiteName = os.path.split(payload) 
+        jyLog = open(os.path.join(logFolder, ("%s_Log.txt" % self.name)), "w")        
+        jybotCommand = "pybot -o %s %s" % (os.path.join(logFolder, self.output_file), self.suite)
+        
+        print "Executing :        %s ..." % jybotCommand
+        self.running = True
+        self.process = subprocess.Popen(["pybot", "-o", "%s" % os.path.join(logFolder, self.output_file), "%s" % self.suite], cwd=clientCwd, stdout=jyLog, stderr=jyLog)
+   
+    def isRunning(self):
+        """ Polls the pybot subprocess to check if it's running. Will return true if the process is running.
+        Returns false if the process hasn't been started or has finished already.
+        """
+        if not self.running:
+            return False
+        elif self.process.poll() == 0 or self.process.returncode >= 0:
+            return False
+        else:
+            return True
+   
+    def stop(self):
+        """ Kills the pybot subprocess.
+        """
+        os.system("taskkill /T /F /PID %s" % self.process.pid)
+        self.running = False
+        
 # Methods #####################################################################################################
 def startJybot(name, suite, args=[]):
     """ Creates a pybot object, starts it and returns the object
@@ -53,19 +101,20 @@ def parseArgs(argv):
     if len(argv)<1:
         usage()
         sys.exit(2)
-   
-    # last argument is test suite name
+        
     suiteToRun = payload = argv[len(argv)-1]
-    #args_file = argv[len(argv)-4]
-    #print "args_file: %s" % args_file
+    
      
     if len(os.path.split(payload)) == 0:
         clientCwd = "./"
     else:
         clientCwd = os.path.realpath(baseDir)
     
-    #last commented line
     payload = os.path.join(os.path.realpath(baseDir), payload)
+    if not os.path.exists(payload):
+        print "FATAL - Pyro must be given a payload that exists: %s\n" % payload
+        exit(1)
+   
    #####
  ####  logFolder = os.path.abspath(logFolder)
     logFolder = payload
@@ -118,53 +167,7 @@ def usage():
  
 # helper classes ##############################################################################################
  
-class Jybot():
-    """ Helper class to interact with RobotFrameworks pybot script to execute tests / test suites.    
-    """
-    name = ""
-    tests = []
-    suite = ""
-    args = []
-    output = ""
-    process = -1
-    running = False
-   
-    def __init__(self, name):
-        """ Constructor, creates the object and assigns the given 'name'.
-        """
-        self.name = name
-   
-    def start(self, suite, args=[]):
-        """ Starts the pybot script from RobotFramework executing the defined 'tests' from the given 'suite'.
-        'suite' is the filename of the test suite containing the 'tests'
-        'args' (optional) is a list of additional parameters passed to pybot
-        """
-        self.suite = suite
-        self.output_file = "%s_Output.xml" % (self.name)
-        temp, suiteName = os.path.split(payload) 
-        jyLog = open(os.path.join(logFolder, ("%s_Log.txt" % self.name)), "w")        
-        jybotCommand = "pybot -o %s %s" % (os.path.join(logFolder, self.output_file), self.suite)
-        
-        print "Executing :        %s ..." % jybotCommand
-        self.running = True
-        self.process = subprocess.Popen(["pybot", "-o", "%s" % os.path.join(logFolder, self.output_file), "%s" % self.suite], cwd=clientCwd, stdout=jyLog, stderr=jyLog)
-   
-    def isRunning(self):
-        """ Polls the pybot subprocess to check if it's running. Will return true if the process is running.
-        Returns false if the process hasn't been started or has finished already.
-        """
-        if not self.running:
-            return False
-        elif self.process.poll() == 0 or self.process.returncode >= 0:
-            return False
-        else:
-            return True
-   
-    def stop(self):
-        """ Kills the pybot subprocess.
-        """
-        os.system("taskkill /T /F /PID %s" % self.process.pid)
-        self.running = False
+
  
 # MAIN SCRIPT #################################################################################################
 
@@ -196,6 +199,10 @@ logFolder = config.LOG_DIR
 
 os.environ['SAUCE_ONDEMAND_BROWSERS'] =  '[{"platform":"LINUX","os":"Linux","browser":"chrome","url":"sauce-ondemand:?os=Linux&browser=chrome&browser-version=32&username=talliskane&access-key=6c3ed64b-e065-4df4-b921-75336e2cb9cf","browser-version":"32"},{"platform":"LINUX","os":"Linux","browser":"android","url":"sauce-ondemand:?os=Linux&browser=android&browser-version=4.0&username=talliskane&access-key=6c3ed64b-e065-4df4-b921-75336e2cb9cf","browser-version":"4.0"}]'
 
+
+# parsing command line arguments
+parseArgs(sys.argv[1:])   
+
 construct = SauceTeamCityBrowserData()
 #print construct.getBrowsersString(sauce_username,sauce_accesskey)
 browser_list = construct.getBrowsersString()
@@ -203,8 +210,7 @@ browser_list = construct.getBrowsersString()
 #print construct.getBrowser(0)
 #print construct.getUserName(0)
 
-# parsing command line arguments
-parseArgs(sys.argv[1:])        
+     
 
 
 suiteName = os.path.basename(os.path.normpath(payload))
